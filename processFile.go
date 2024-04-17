@@ -12,47 +12,37 @@ import (
 // process the input file and return the output string.
 func processInput(inputFile *os.File, csvFile *os.File, iataIndex, icaoIndex, nameIndex int) (string, error) {
 	scanner := bufio.NewScanner(inputFile)
-	// use regexp to recognize patterns for codes and dates
 	iataRegex, _ := regexp.Compile(`#[A-Z]{3}`)
 	icaoRegex, _ := regexp.Compile(`##[A-Z]{4}`)
 	dateRegex, _ := regexp.Compile(`([DT])(\d{2})?\((\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(Z|[\+\-]\d{2}:\d{2}))\)`)
-	var output strings.Builder
+	var output []string
+	var lastLineWasBlank bool
 
-	prevLineEmpty := false // flag to track previous line was empty
 	for scanner.Scan() {
 		line := scanner.Text()
-		line = strings.TrimSpace(line)
-
-		// If the line is empty and previous line was empty, skip writing to output
-		if line == "" && prevLineEmpty {
-			continue
-		}
-
-		// Add newline if previous line was not empty
-		if prevLineEmpty {
-			output.WriteString("\n")
-		}
-
-		// trim white space and replace consecutive white space with a single blank line
-		line = strings.TrimSpace(line)
 		line = strings.ReplaceAll(line, "\v", "\n")
 		line = strings.ReplaceAll(line, "\f", "\n")
 		line = strings.ReplaceAll(line, "\r", "\n")
 
-		re := regexp.MustCompile(`\n{3,}`)
-		line = re.ReplaceAllString(line, "\n\n")
+		line = strings.TrimSpace(line)
 
-		matches := findMatches(line, iataRegex, icaoRegex, dateRegex)
-		output.WriteString(processAllMatches(matches, line, csvFile, iataIndex, icaoIndex, nameIndex))
-
-		// Update flag
-		prevLineEmpty = line == ""
+		if line == "" {
+			if !lastLineWasBlank {
+				output = append(output, "\n")
+				lastLineWasBlank = true
+			}
+		} else {
+			lastLineWasBlank = false
+			matches := findMatches(line, iataRegex, icaoRegex, dateRegex)
+			output = append(output, processAllMatches(matches, line, csvFile, iataIndex, icaoIndex, nameIndex))
+		}
 	}
 
 	if err := scanner.Err(); err != nil {
 		return "", fmt.Errorf("error reading from input file: %v", err)
 	}
-	return output.String(), nil
+
+	return strings.Join(output, ""), nil
 }
 
 // find all IATA and ICAO code and date matches.
@@ -79,25 +69,27 @@ func findMatches(line string, iataRegex, icaoRegex, dateRegex *regexp.Regexp) []
 
 // process matches and return the result string.
 func processAllMatches(matches []Match, line string, csvFile *os.File, iataIndex, icaoIndex, nameIndex int) string {
-	// sort matches by index
-	sort.Slice(matches, func(i, j int) bool {
-		return matches[i].Index < matches[j].Index
-	})
+    // sort matches by index
+    sort.Slice(matches, func(i, j int) bool {
+        return matches[i].Index < matches[j].Index
+    })
 
-	for _, match := range matches {
-		var replacement string
-		switch match.Type {
-		case "iata", "icao":
-			replacement = codeLookup(match.Value, csvFile, iataIndex, icaoIndex, nameIndex)
-		case "date":
-			adjustedTime, err := processLine(match.Value)
-			if err == nil {
-				replacement = adjustedTime
-			}
-		}
-		line = strings.Replace(line, match.Value, replacement, 1)
-	}
+    for _, match := range matches {
+        var replacement string
+        switch match.Type {
+        case "iata", "icao":
+            replacement = codeLookup(match.Value, csvFile, iataIndex, icaoIndex, nameIndex)
+        case "city":
+            cityCode := match.Value // No need to remove the '*' prefix
+            replacement = lookupCity(cityCode, csvFile, nameIndex)
+        case "date":
+            adjustedTime, err := processLine(match.Value)
+            if err == nil {
+                replacement = adjustedTime
+            }
+        }
+        line = strings.Replace(line, match.Value, replacement, 1)
+    }
 
-	return line + "\n"
+    return line + "\n"
 }
-

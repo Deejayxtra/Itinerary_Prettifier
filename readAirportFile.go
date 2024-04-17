@@ -63,24 +63,54 @@ func findColumnIndices(header []string) (int, int, int) {
 
 // look up a code in the CSV and return the name as string.
 func codeLookup(code string, csvFile *os.File, iataIndex, icaoIndex, nameIndex int) string {
-	codeLookup := strings.TrimPrefix(strings.TrimPrefix(code, "#"), "#")
-	csvFile.Seek(0, io.SeekStart)
-	csvReader := csv.NewReader(csvFile)
-	csvReader.TrimLeadingSpace = true
-	csvReader.Read()
+    if strings.HasPrefix(code, "*#") {
+        cityName := code[2:] // Remove the '*' and '#' prefix
+        return cityName
+    }
 
-	for {
-		record, err := csvReader.Read()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			fmt.Println("error reading a record:", err)
-			break
-		}
-		if record[iataIndex] == codeLookup || record[icaoIndex] == codeLookup {
-			return record[nameIndex]
-		}
-	}
-	return ""
+    codeLookup := strings.TrimPrefix(strings.TrimPrefix(code, "#"), "#")
+    csvFile.Seek(0, io.SeekStart)
+    csvReader := csv.NewReader(csvFile)
+    csvReader.TrimLeadingSpace = true
+    csvReader.Read()
+
+    for {
+        record, err := csvReader.Read()
+        if err == io.EOF {
+            break
+        }
+        if err != nil {
+            fmt.Println("error reading a record:", err)
+            break
+        }
+        if record[iataIndex] == codeLookup || record[icaoIndex] == codeLookup {
+            return record[nameIndex]
+        }
+    }
+    return ""
+}
+
+// lookupCity looks up the city name based on the provided code.
+func lookupCity(code string, csvFile *os.File, nameIndex int) string {
+    lookupCode := strings.TrimPrefix(code, "*")
+    csvFile.Seek(0, io.SeekStart)
+    csvReader := csv.NewReader(csvFile)
+    csvReader.TrimLeadingSpace = true
+    csvReader.Read()
+
+    for {
+        record, err := csvReader.Read()
+        if err == io.EOF {
+            break
+        }
+        if err != nil {
+            fmt.Println("error reading a record:", err)
+            break
+        }
+
+        if strings.EqualFold(record[nameIndex], lookupCode) {
+            return record[nameIndex]
+        }
+    }
+    return ""
 }

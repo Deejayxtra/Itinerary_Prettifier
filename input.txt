@@ -8,6 +8,7 @@ T24(2084-04-13T17:54Z)
 T24(2024-07-23T15:29-11:00)
 T24(2042-09-01T21:43Z)
 
+ *#LHR
 
 Flight LH654 from "#CDG" to "#BNE" departs by T24(2084-04-13T17:54Z)
 Flight from "#LHR" to "#ECV" departs by T12(2080-05-04T14:54Z)
